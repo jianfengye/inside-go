@@ -334,16 +334,17 @@ type gobuf struct {
 //
 // sudogs are allocated from a special pool. Use acquireSudog and
 // releaseSudog to allocate and free them.
+// sudog代表g和一个hchan的关系
 type sudog struct {
 	// The following fields are protected by the hchan.lock of the
 	// channel this sudog is blocking on. shrinkstack depends on
 	// this for sudogs involved in channel ops.
 
-	g *g
+	g *g // goroutine
 
 	// isSelect indicates g is participating in a select, so
 	// g.selectDone must be CAS'd to win the wake-up race.
-	isSelect bool
+	isSelect bool // 表示这个g是否在select中
 	next     *sudog
 	prev     *sudog
 	elem     unsafe.Pointer // data element (may point to stack)
@@ -562,7 +563,7 @@ type p struct {
 		n int32
 	}
 
-	sudogcache []*sudog
+	sudogcache []*sudog //p上面运行的g与hchan的关系
 	sudogbuf   [128]*sudog
 
 	tracebuf traceBufPtr

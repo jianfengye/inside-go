@@ -285,6 +285,7 @@ func goschedguarded() {
 // It is displayed in stack traces and heap dumps.
 // Reasons should be unique and descriptive.
 // Do not re-use reasons, add new ones.
+// 把当前的goroutine设置为waiting状态，并且阻塞执行调度
 func gopark(unlockf func(*g, unsafe.Pointer) bool, lock unsafe.Pointer, reason waitReason, traceEv byte, traceskip int) {
 	if reason != waitReasonSleep {
 		checkTimeouts() // timeouts may expire while two goroutines keep the scheduler busy
@@ -311,6 +312,7 @@ func goparkunlock(lock *mutex, reason waitReason, traceEv byte, traceskip int) {
 	gopark(parkunlock_c, unsafe.Pointer(lock), reason, traceEv, traceskip)
 }
 
+// 把gp设置为ready状态，等待调度器调度
 func goready(gp *g, traceskip int) {
 	systemstack(func() {
 		ready(gp, traceskip, true)
@@ -344,6 +346,7 @@ func acquireSudog() *sudog {
 			pp.sudogcache = append(pp.sudogcache, new(sudog))
 		}
 	}
+	// 从p的sudocache中获取最后一个sudog, 并且把p的sudocache缩容
 	n := len(pp.sudogcache)
 	s := pp.sudogcache[n-1]
 	pp.sudogcache[n-1] = nil
@@ -649,6 +652,7 @@ func mcommoninit(mp *m) {
 }
 
 // Mark gp ready to run.
+// 把一个gp设置为ready状态
 func ready(gp *g, traceskip int, next bool) {
 	if trace.enabled {
 		traceGoUnpark(gp, traceskip)
@@ -667,6 +671,7 @@ func ready(gp *g, traceskip int, next bool) {
 	// status is Gwaiting or Gscanwaiting, make Grunnable and put on runq
 	casgstatus(gp, _Gwaiting, _Grunnable)
 	runqput(_g_.m.p.ptr(), gp, next)
+	// 调度器中空闲的p数量还有，且调度器的nmspinging为0
 	if atomic.Load(&sched.npidle) != 0 && atomic.Load(&sched.nmspinning) == 0 {
 		wakep()
 	}
@@ -1969,7 +1974,7 @@ func stopm() {
 	lock(&sched.lock)
 	mput(_g_.m)
 	unlock(&sched.lock)
-	notesleep(&_g_.m.park)
+	notesleep(&_g_.m.park) // 将m设置为空闲，这里会被block主
 	noteclear(&_g_.m.park)
 	acquirep(_g_.m.nextp.ptr())
 	_g_.m.nextp = 0
@@ -2323,6 +2328,7 @@ stop:
 		return gp, false
 	}
 
+	// 下面的逻辑就是确实在全局中找不到可以执行的goroutine了，将当前m设置为idle
 	// wasm only:
 	// If a callback returned and no other goroutine is awake,
 	// then pause execution until a callback was triggered.
@@ -2352,7 +2358,7 @@ stop:
 	if releasep() != _p_ {
 		throw("findrunnable: wrong p")
 	}
-	pidleput(_p_)
+	pidleput(_p_) // 将p设置为idle
 	unlock(&sched.lock)
 
 	// Delicate dance: thread transitions from spinning to non-spinning state,
@@ -2441,7 +2447,7 @@ stop:
 			injectglist(&list)
 		}
 	}
-	stopm()
+	stopm() // 将m设置为空闲，这里也会阻塞住m，使用sleep，只有wakeup才会被返回
 	goto top
 }
 
@@ -2511,7 +2517,7 @@ func injectglist(glist *gList) {
 
 // One round of scheduler: find a runnable goroutine and execute it.
 // Never returns.
-// 开启调度
+// 开启调度, g0来寻找一个可运行的goroutine，然后执行它
 func schedule() {
 	_g_ := getg()
 
@@ -2643,6 +2649,7 @@ func parkunlock_c(gp *g, lock unsafe.Pointer) bool {
 }
 
 // park continuation on g0.
+// 把g0设置成waiting状态，并且执行一次调度schedule
 func park_m(gp *g) {
 	_g_ := getg()
 
@@ -2665,7 +2672,7 @@ func park_m(gp *g) {
 			execute(gp, true) // Schedule it back, never returns.
 		}
 	}
-	schedule()
+	schedule() //进入调度执行执行
 }
 
 func goschedImpl(gp *g) {
@@ -4785,14 +4792,14 @@ func globrunqget(_p_ *p, max int32) *g {
 // Sched must be locked.
 // May run during STW, so write barriers are not allowed.
 //go:nowritebarrierrec
-// inside: 将p放到sched的空闲p的列表中
+// 将p放到sched的空闲p的列表中，这里设置了sched.npidle，说明当前这个p空闲了
 func pidleput(_p_ *p) {
 	if !runqempty(_p_) {
 		throw("pidleput: P has non-empty run queue")
 	}
 	_p_.link = sched.pidle
 	sched.pidle.set(_p_)
-	atomic.Xadd(&sched.npidle, 1) // TODO: fast atomic
+	atomic.Xadd(&sched.npidle, 1) // 设置调度的空闲idle值 TODO: fast atomic
 }
 
 // Try get a p from _Pidle list.

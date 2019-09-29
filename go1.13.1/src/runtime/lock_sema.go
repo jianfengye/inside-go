@@ -154,6 +154,7 @@ func notewakeup(n *note) {
 	}
 }
 
+// 这个函数会阻塞，semasleep，等待有用note来进行notewakeup的时候才会回复
 func notesleep(n *note) {
 	gp := getg()
 	if gp != gp.m.g0 {
@@ -170,7 +171,7 @@ func notesleep(n *note) {
 	// Queued. Sleep.
 	gp.m.blocked = true
 	if *cgo_yield == nil {
-		semasleep(-1)
+		semasleep(-1)  // 这里会进行阻塞，等待唤醒
 	} else {
 		// Sleep for an arbitrary-but-moderate interval to poll libc interceptors.
 		const ns = 10e6

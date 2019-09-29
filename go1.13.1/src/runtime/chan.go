@@ -38,7 +38,9 @@ type hchan struct {
 	elemtype *_type // element type
 	sendx    uint   // send index
 	recvx    uint   // receive index
+	// 接收队列
 	recvq    waitq  // list of recv waiters
+	// 发送队列
 	sendq    waitq  // list of send waiters
 
 	// lock protects all fields in hchan, as well as several
@@ -188,6 +190,7 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 		panic(plainError("send on closed channel"))
 	}
 
+	// 如果recv队列中有recv的，就进入
 	if sg := c.recvq.dequeue(); sg != nil {
 		// Found a waiting receiver. We pass the value we want to send
 		// directly to the receiver, bypassing the channel buffer (if any).
@@ -267,11 +270,14 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 // Channel c must be empty and locked.  send unlocks c with unlockf.
 // sg must already be dequeued from c.
 // ep must be non-nil and point to the heap or the caller's stack.
+// 这个函数已经找到了hchan的两方，发送方是当前的goroutine， 接收方是sg对应的goroutine
 func send(c *hchan, sg *sudog, ep unsafe.Pointer, unlockf func(), skip int) {
 	if raceenabled {
 		if c.dataqsiz == 0 {
+			// 没有buffer的时候直接sync
 			racesync(c, sg)
 		} else {
+			// 有buffer的时候重置sendx和recvx
 			// Pretend we go through the buffer, even though
 			// we copy directly. Note that we need to increment
 			// the head/tail locations only when raceenabled.
@@ -288,6 +294,7 @@ func send(c *hchan, sg *sudog, ep unsafe.Pointer, unlockf func(), skip int) {
 		}
 	}
 	if sg.elem != nil {
+		// 发送数据给sg
 		sendDirect(c.elemtype, sg, ep)
 		sg.elem = nil
 	}
@@ -404,6 +411,8 @@ func closechan(c *hchan) {
 // entry points for <- c from compiled code
 //go:nosplit
 // 调用<-c 等一个channel出来数据的时候
+// 参数c : channel机构
+// 参数elem: 接收信息返回的地址
 func chanrecv1(c *hchan, elem unsafe.Pointer) {
 	chanrecv(c, elem, true)
 }
@@ -420,6 +429,7 @@ func chanrecv2(c *hchan, elem unsafe.Pointer) (received bool) {
 // Otherwise, if c is closed, zeros *ep and returns (true, false).
 // Otherwise, fills in *ep with an element and returns (true, true).
 // A non-nil ep must point to the heap or the caller's stack.
+//
 func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool) {
 	// raceenabled: don't need to check ep, as it is always on the stack
 	// or is new memory allocated by reflect.
@@ -472,6 +482,7 @@ func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool)
 		return true, false
 	}
 
+	// 这个逻辑是检查下发送队列是否有发送的数据，如果有的话，就进入if，进行返回, 不阻塞了
 	if sg := c.sendq.dequeue(); sg != nil {
 		// Found a waiting sender. If buffer is size 0, receive value
 		// directly from sender. Otherwise, receive from head of queue
@@ -507,8 +518,9 @@ func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool)
 	}
 
 	// no sender available: block on this channel.
+	// 进入到这里，就已经表示会阻塞了
 	gp := getg()
-	mysg := acquireSudog()
+	mysg := acquireSudog() // 从p的sudogcache中获取关系结构sudog
 	mysg.releasetime = 0
 	if t0 != 0 {
 		mysg.releasetime = -1
@@ -522,7 +534,8 @@ func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool)
 	mysg.isSelect = false
 	mysg.c = c
 	gp.param = nil
-	c.recvq.enqueue(mysg)
+	c.recvq.enqueue(mysg) // 往接收队列中塞入这个sudog
+	// 这里把当前goroutine的状态设置为waiting，并且交出执行权给调度器去执行其他goroutine，直接阻塞
 	goparkunlock(&c.lock, waitReasonChanReceive, traceEvGoBlockRecv, 3)
 
 	// someone woke us up

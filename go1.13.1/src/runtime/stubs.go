@@ -31,6 +31,7 @@ func getg() *g // 获取当前的g
 // This must NOT be go:noescape: if fn is a stack-allocated closure,
 // fn puts g on a run queue, and g executes before fn returns, the
 // closure will be invalidated while it is still executing.
+// 这个函数是让g0调用fn
 func mcall(fn func(*g))
 
 // systemstack runs fn on a system stack.
