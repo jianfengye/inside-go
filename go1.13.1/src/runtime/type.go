@@ -26,21 +26,22 @@ const (
 // Needs to be in sync with ../cmd/link/internal/ld/decodesym.go:/^func.commonsize,
 // ../cmd/compile/internal/gc/reflect.go:/^func.dcommontype and
 // ../reflect/type.go:/^type.rtype.
+// 代表基础类型+自定义类型
 type _type struct {
-	size       uintptr
+	size       uintptr // 这个类型的长度
 	ptrdata    uintptr // size of memory prefix holding all pointers
-	hash       uint32
+	hash       uint32 // hash值
 	tflag      tflag
-	align      uint8
-	fieldalign uint8
-	kind       uint8
+	align      uint8 // 对齐
+	fieldalign uint8 // field对齐
+	kind       uint8  // reflect包中的Kind类型这个，是枚举值
 	// function for comparing objects of this type
 	// (ptr to object A, ptr to object B) -> ==?
-	equal func(unsafe.Pointer, unsafe.Pointer) bool
+	equal func(unsafe.Pointer, unsafe.Pointer) bool // 比较函数
 	// gcdata stores the GC type data for the garbage collector.
 	// If the KindGCProg bit is set in kind, gcdata is a GC program.
 	// Otherwise it is a ptrmask bitmap. See mbitmap.go for details.
-	gcdata    *byte
+	gcdata    *byte // gc的数据
 	str       nameOff
 	ptrToThis typeOff
 }

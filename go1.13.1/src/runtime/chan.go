@@ -38,9 +38,9 @@ type hchan struct {
 	elemtype *_type // element type
 	sendx    uint   // send index
 	recvx    uint   // receive index
-	// 接收队列
+	// 接收队列，所有等着从这个channel接收信息的g都在这个队列中
 	recvq    waitq  // list of recv waiters
-	// 发送队列
+	// 发送队列，所有等着往这个channel发送信息的g在这个队列中
 	sendq    waitq  // list of send waiters
 
 	// lock protects all fields in hchan, as well as several
@@ -52,6 +52,7 @@ type hchan struct {
 	lock mutex
 }
 
+// 组成队列结构
 type waitq struct {
 	first *sudog
 	last  *sudog

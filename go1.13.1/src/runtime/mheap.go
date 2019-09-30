@@ -28,7 +28,7 @@ const minPhysPageSize = 4096
 // which must not be heap-allocated.
 //
 //go:notinheap
-// 主要的堆管理器
+// 主要的堆管理
 type mheap struct {
 	// lock must only be acquired on the system stack, otherwise a g
 	// could self-deadlock if its stack grows with the lock held.
@@ -49,6 +49,7 @@ type mheap struct {
 	// store. Accesses during STW might not hold the lock, but
 	// must ensure that allocation cannot happen around the
 	// access (since that may free the backing store).
+	// mheap里面的所有span, 包括已经被使用和未被使用的
 	allspans []*mspan // all spans out there
 
 	// sweepSpans contains two mspan stacks: one of swept in-use
@@ -650,8 +651,8 @@ func recordspan(vh unsafe.Pointer, p unsafe.Pointer) {
 type spanClass uint8
 
 const (
-	numSpanClasses = _NumSizeClasses << 1
-	tinySpanClass  = spanClass(tinySizeClass<<1 | 1)
+	numSpanClasses = _NumSizeClasses << 1 // 134
+	tinySpanClass  = spanClass(tinySizeClass<<1 | 1) // 5个
 )
 
 func makeSpanClass(sizeclass uint8, noscan bool) spanClass {

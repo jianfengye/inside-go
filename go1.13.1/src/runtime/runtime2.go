@@ -388,6 +388,7 @@ type stack struct {
 	hi uintptr
 }
 
+// goroutine的结构，非常重要
 type g struct {
 	// Stack parameters.
 	// stack describes the actual stack memory: [stack.lo, stack.hi).
@@ -396,13 +397,15 @@ type g struct {
 	// stackguard1 is the stack pointer compared in the C stack growth prologue.
 	// It is stack.lo+StackGuard on g0 and gsignal stacks.
 	// It is ~0 on other goroutine stacks, to trigger a call to morestackc (and crash).
+	// 当前goroutine的栈地址，栈的高点和栈的低点
 	stack       stack   // offset known to runtime/cgo
+	// 堆栈保护设置，防止堆栈溢出攻击等行为
 	stackguard0 uintptr // offset known to liblink
 	stackguard1 uintptr // offset known to liblink
 
 	_panic         *_panic // innermost panic - offset known to liblink
 	_defer         *_defer // innermost defer
-	m              *m      // 当前goroutine运行所在的m
+	m              *m     // 当前goroutine运行所在的m
 	sched          gobuf  // goroutine的运行现场
 	syscallsp      uintptr        // if status==Gsyscall, syscallsp = sched.sp to use during gc
 	syscallpc      uintptr        // if status==Gsyscall, syscallpc = sched.pc to use during gc
@@ -453,6 +456,7 @@ type g struct {
 	gcAssistBytes int64
 }
 
+// m模型结构，重要！！
 type m struct {
 	g0      *g     // 母g0地址 goroutine with scheduling stack
 	morebuf gobuf  // gobuf arg to morestack
@@ -471,7 +475,7 @@ type m struct {
 	nextp         puintptr
 	oldp          puintptr // the p that was attached before executing a syscall
 	id            int64   // m的唯一标示
-	mallocing     int32
+	mallocing     int32   // 当前m是否正在执行分配内存操作，这里指的是分配mcache
 	throwing      int32
 	preemptoff    string // if != "", keep curg running on this m
 	locks         int32
@@ -493,7 +497,7 @@ type m struct {
 	park          note
 	alllink       *m // on allm
 	schedlink     muintptr
-	mcache        *mcache // m的缓存
+	mcache        *mcache // m的本地缓存
 	lockedg       guintptr // m被哪个g锁住了
 	createstack   [32]uintptr // stack that created this thread.
 	lockedExt     uint32      // tracking for external LockOSThread

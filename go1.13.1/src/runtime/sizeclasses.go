@@ -72,7 +72,7 @@ package runtime
 //    66      32768       32768        1           0     12.50%
 
 const (
-	_MaxSmallSize   = 32768
+	_MaxSmallSize   = 32768  // 32kB
 	smallSizeDiv    = 8
 	smallSizeMax    = 1024
 	largeSizeDiv    = 128

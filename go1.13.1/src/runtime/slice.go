@@ -31,9 +31,14 @@ func panicmakeslicecap() {
 	panic(errorString("makeslice: cap out of range"))
 }
 
+// 创建一个slice结构
+// et, slice单个元素的类型，len，slice的长度，cap，slice的容量
+// 返回slice的指针
 func makeslice(et *_type, len, cap int) unsafe.Pointer {
+	// 计算需要的空间
 	mem, overflow := math.MulUintptr(et.size, uintptr(cap))
 	if overflow || mem > maxAlloc || len < 0 || len > cap {
+		// 直接报错
 		// NOTE: Produce a 'len out of range' error instead of a
 		// 'cap out of range' error when someone does make([]T, bignumber).
 		// 'cap out of range' is true too, but since the cap is only being

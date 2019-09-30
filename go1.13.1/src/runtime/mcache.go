@@ -16,6 +16,7 @@ import (
 // must be specially handled.
 //
 //go:notinheap
+// m的本地缓存，一个m，也就是一个p有一个本地缓存，主要用于小对象的内存分配
 type mcache struct {
 	// The following members are accessed on every malloc,
 	// so they are grouped here for better caching.
@@ -31,12 +32,15 @@ type mcache struct {
 	// tiny is a heap pointer. Since mcache is in non-GC'd memory,
 	// we handle it by clearing it in releaseAll during mark
 	// termination.
-	tiny             uintptr
-	tinyoffset       uintptr
+	// 下面是微小内存分配器的设置，tiny是一个堆指针。由于macache是一个非GC托管的内存
+	// 我们只能依靠标记结束来处理微小内存分配。
+	tiny             uintptr // 堆指针，指向微小内存分配地址
+	tinyoffset       uintptr // 堆指针偏移
 	local_tinyallocs uintptr // number of tiny allocs not counted in other stats
 
 	// The rest is not accessed on every malloc.
 
+	// 已经分配回来的内存
 	alloc [numSpanClasses]*mspan // spans to allocate from, indexed by spanClass
 
 	stackcache [_NumStackOrders]stackfreelist
