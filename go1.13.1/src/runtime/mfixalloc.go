@@ -24,6 +24,7 @@ import "unsafe"
 // smashed by freeing and reallocating.
 //
 // Consider marking fixalloc'd types go:notinheap.
+// fixalloc是为了mcache或者msapn这种有固定size的对象设计的，是mheap中最重要的结构
 type fixalloc struct {
 	size   uintptr
 	first  func(arg, p unsafe.Pointer) // called first time p is returned

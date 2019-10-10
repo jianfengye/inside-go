@@ -127,7 +127,7 @@ const (
 
 	concurrentSweep = _ConcurrentSweep
 
-	_PageSize = 1 << _PageShift // 单页大小，8192
+	_PageSize = 1 << _PageShift // 单页大小，8192, 就是8KB
 	_PageMask = _PageSize - 1
 
 	// _64bit = 1 on 64-bit systems, 0 on 32-bit systems
@@ -815,9 +815,11 @@ var zerobase uintptr
 // nextFreeFast returns the next free object if one is quickly available.
 // Otherwise it returns 0.
 func nextFreeFast(s *mspan) gclinkptr {
+	// 获取第一个非0的bit是第几个bit, 也就是哪个元素是未分配的
 	theBit := sys.Ctz64(s.allocCache) // Is there a free object in the allocCache?
-	if theBit < 64 {
+	if theBit < 64 { // 如果找到了
 		result := s.freeindex + uintptr(theBit)
+		// 索引值小于未分配的数量
 		if result < s.nelems {
 			freeidx := result + 1
 			if freeidx%64 == 0 && freeidx != s.nelems {
@@ -937,14 +939,15 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 	if mp.gsignal == getg() {
 		throw("malloc during signal")
 	}
+	// 把当前m设置为正在分配地址状态标记
 	mp.mallocing = 1
 
 	shouldhelpgc := false
 	dataSize := size
 	c := gomcache() // 获取当前的g的m的mcache
 	var x unsafe.Pointer
-	noscan := typ == nil || typ.ptrdata == 0
-	if size <= maxSmallSize { // 如果是小对象
+	noscan := typ == nil || typ.ptrdata == 0 // 确定出这个是不是一个指针类型
+ 	if size <= maxSmallSize { // 如果是小对象
 		if noscan && size < maxTinySize {
 			// Tiny allocator.
 			//
@@ -1039,7 +1042,9 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 			}
 			size = uintptr(class_to_size[sizeclass]) // size这里进行了调整
 			spc := makeSpanClass(sizeclass, noscan)
+			// 这里获取了mcache中的span
 			span := c.alloc[spc]
+			// 查看这个span里面还有没有空的object
 			v := nextFreeFast(span) // 按照span下标分为了几类，从这个spanClass中获取空闲的位置
 			if v == 0 {
 				v, span, shouldhelpgc = c.nextFree(spc) // 从下一个空闲的spec中获取

@@ -157,6 +157,8 @@ const (
 // GOGC==0, this will set heapminimum to 0, resulting in constant
 // collection even when the heap size is small, which is useful for
 // debugging.
+//
+// 当heap的大小达到这个值的时候就强制触发gc。在初始化的时候会被设置为4MB * GOGC/100
 var heapminimum uint64 = defaultHeapMinimum
 
 // defaultHeapMinimum is the value of heapminimum for GOGC==100.
@@ -171,6 +173,7 @@ func gcinit() {
 	}
 
 	// No sweep on the first cycle.
+	// 第一次，假设刚结束了一轮gc
 	mheap_.sweepdone = 1
 
 	// Set a reasonable initial GC trigger.
@@ -179,16 +182,19 @@ func gcinit() {
 	// Fake a heap_marked value so it looks like a trigger at
 	// heapminimum is the appropriate growth from heap_marked.
 	// This will go into computing the initial GC goal.
+	// 构造了一个上一轮gc的字节数
 	memstats.heap_marked = uint64(float64(heapminimum) / (1 + memstats.triggerRatio))
 
 	// Set gcpercent from the environment. This will also compute
 	// and set the GC trigger and goal.
+	// 设置gc启动的百分比
 	_ = setGCPercent(readgogc())
 
 	work.startSema = 1
 	work.markDoneSema = 1
 }
 
+// 读取环境变量GOGC设置的gc启动百分比
 func readgogc() int32 {
 	p := gogetenv("GOGC")
 	if p == "off" {
@@ -224,6 +230,7 @@ func setGCPercent(in int32) (out int32) {
 			in = -1
 		}
 		gcpercent = in
+		// heap的最低限额
 		heapminimum = defaultHeapMinimum * uint64(gcpercent) / 100
 		// Update pacing in response to gcpercent change.
 		gcSetTriggerRatio(memstats.triggerRatio)
@@ -241,6 +248,7 @@ func setGCPercent(in int32) (out int32) {
 
 // Garbage collector phase.
 // Indicates to write barrier and synchronization task to perform.
+// 全局设置一个gc阶段标记
 var gcphase uint32
 
 // The compiler knows about this variable.
@@ -913,6 +921,7 @@ const gcAssistTimeSlack = 5000
 // assist by pre-paying for this many bytes of future allocations.
 const gcOverAssistWork = 64 << 10
 
+// 全局设置一个gc的工作状态的结构
 var work struct {
 	full  lfstack          // lock-free list of full blocks workbuf
 	empty lfstack          // lock-free list of empty blocks workbuf
@@ -945,6 +954,8 @@ var work struct {
 	//
 	// Put this field here because it needs 64-bit atomic access
 	// (and thus 8-byte alignment even on 32-bit architectures).
+	//
+	// 这一轮有多少字节被标记
 	bytesMarked uint64
 
 	markrootNext uint32 // next markroot job
@@ -1006,6 +1017,7 @@ var work struct {
 
 	// sweepWaiters is a list of blocked goroutines to wake when
 	// we transition from mark termination to sweep.
+	// 存储的是等待被sweep的goroutine
 	sweepWaiters struct {
 		lock mutex
 		list gList

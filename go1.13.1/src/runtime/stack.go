@@ -139,6 +139,7 @@ const (
 // Stacks are assigned an order according to size.
 //     order = log_2(size/FixedStack)
 // There is a free list for each order.
+// 全局有一个goroutine申请栈空间时候的缓存池，这个是小size
 var stackpool [_NumStackOrders]struct {
 	item stackpoolItem
 	_    [cpu.CacheLinePadSize - unsafe.Sizeof(stackpoolItem{})%cpu.CacheLinePadSize]byte
@@ -151,6 +152,7 @@ type stackpoolItem struct {
 }
 
 // Global pool of large stack spans.
+// 全局的goroutine申请栈空间时候的对象，这个是大size
 var stackLarge struct {
 	lock mutex
 	free [heapAddrBits - pageShift]mSpanList // free lists by log_2(s.npages)
@@ -180,6 +182,7 @@ func stacklog2(n uintptr) int {
 
 // Allocates a stack from the free pool. Must be called with
 // stackpool[order].item.mu held.
+// 从全局栈缓存池中分配
 func stackpoolalloc(order uint8) gclinkptr {
 	list := &stackpool[order].item.span
 	s := list.first
@@ -322,6 +325,7 @@ func stackcache_clear(c *mcache) {
 // resources and must not split the stack.
 //
 //go:systemstack
+// 申请goroutine的栈空间
 func stackalloc(n uint32) stack {
 	// Stackalloc must be called on scheduler stack, so that we
 	// never try to grow the stack during the code that stackalloc runs.
@@ -350,6 +354,7 @@ func stackalloc(n uint32) stack {
 	// If we need a stack of a bigger size, we fall back on allocating
 	// a dedicated span.
 	var v unsafe.Pointer
+	// 如果需要的栈空间不大，可以直接从mcache中获取
 	if n < _FixedStack<<_NumStackOrders && n < _StackCacheSize {
 		order := uint8(0)
 		n2 := n
@@ -364,12 +369,15 @@ func stackalloc(n uint32) stack {
 			// procresize. Just get a stack from the global pool.
 			// Also don't touch stackcache during gc
 			// as it's flushed concurrently.
+			// 如果没有mcache或者不禁止用缓存池的话，从全局栈缓存池中获取
 			lock(&stackpool[order].item.mu)
 			x = stackpoolalloc(order)
 			unlock(&stackpool[order].item.mu)
 		} else {
+			// 从mcache的stackcache中获取
 			x = c.stackcache[order].list
 			if x.ptr() == nil {
+				// 如果没有，则重新获取和填充
 				stackcacherefill(c, order)
 				x = c.stackcache[order].list
 			}
@@ -377,12 +385,13 @@ func stackalloc(n uint32) stack {
 			c.stackcache[order].size -= uintptr(n)
 		}
 		v = unsafe.Pointer(x)
-	} else {
+	} else { // 需要的栈空间比较大，则需要单独申请
 		var s *mspan
 		npage := uintptr(n) >> _PageShift
 		log2npage := stacklog2(npage)
 
 		// Try to get a stack from the large stack cache.
+		// 先从stackLarge中获取
 		lock(&stackLarge.lock)
 		if !stackLarge.free[log2npage].isEmpty() {
 			s = stackLarge.free[log2npage].first
@@ -391,6 +400,7 @@ func stackalloc(n uint32) stack {
 		unlock(&stackLarge.lock)
 
 		if s == nil {
+			// 如果stackLarge中获取不到，从mheap中获取
 			// Allocate a new stack from the heap.
 			s = mheap_.allocManual(npage, &memstats.stacks_inuse)
 			if s == nil {
@@ -411,6 +421,7 @@ func stackalloc(n uint32) stack {
 	if stackDebug >= 1 {
 		print("  allocated ", v, "\n")
 	}
+	// 返回了goroutine需要栈的指针和空间
 	return stack{uintptr(v), uintptr(v) + uintptr(n)}
 }
 

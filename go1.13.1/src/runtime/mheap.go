@@ -33,9 +33,11 @@ type mheap struct {
 	// lock must only be acquired on the system stack, otherwise a g
 	// could self-deadlock if its stack grows with the lock held.
 	lock      mutex // 管理器自己的锁
-	free      mTreap // 空闲的内存段 free spans
+	// 空闲的span列表
+	free      mTreap // free spans
+	// 下面三个是和GC相关的
 	sweepgen  uint32 // sweep generation, see comment in mspan
-	sweepdone uint32 // all spans are swept
+	sweepdone uint32 // 当清扫工作结束，这个字段设置为1 all spans are swept
 	sweepers  uint32 // number of active sweepone calls
 
 	// allspans is a slice of all mspans ever created. Each mspan
@@ -194,6 +196,7 @@ type mheap struct {
 	// spaced CacheLinePadSize bytes apart, so that each mcentral.lock
 	// gets its own cache line.
 	// central is indexed by spanClass.
+	// 有134个mcentral, mcentral放在这里存储
 	central [numSpanClasses]struct {
 		mcentral mcentral
 		pad      [cpu.CacheLinePadSize - unsafe.Sizeof(mcentral{})%cpu.CacheLinePadSize]byte
@@ -210,6 +213,7 @@ type mheap struct {
 	unused *specialfinalizer // never set, just here to force the specialfinalizer type into DWARF
 }
 
+// mheap全局只有一个
 var mheap_ mheap
 
 // A heapArena stores metadata for a heap arena. heapArenas are stored
@@ -302,6 +306,7 @@ type arenaHint struct {
 //   and then look up its span, the span state must be monotonic.
 type mSpanState uint8
 
+// mspan的状态
 const (
 	mSpanDead   mSpanState = iota
 	mSpanInUse             // allocated for garbage collected heap
@@ -321,18 +326,24 @@ var mSpanStateNames = []string{
 // mSpanList heads a linked list of spans.
 //
 //go:notinheap
+// 表示的就是一个双向链表的mspan
 type mSpanList struct {
 	first *mspan // first span in list, or nil if none
 	last  *mspan // last span in list, or nil if none
 }
 
 //go:notinheap
+// 这个是golang的内存管理基本单元，它由一些连续的页(每个页的大小为8KB)组成，分基本单元能更为方便管理
+// 每个span会按照某个尺寸切割成为大小相同的小内存块（object）
 type mspan struct {
+	// 可以看到span是作为链表形式存在的
 	next *mspan     // next span in list, or nil if none
 	prev *mspan     // previous span in list, or nil if none
 	list *mSpanList // For debugging. TODO: Remove.
 
+	// 开始地址，第一个byte的位置
 	startAddr uintptr // address of first byte of span aka s.base()
+	// 这个span拥有的page数量
 	npages    uintptr // number of pages in span
 
 	manualFreeList gclinkptr // list of free objects in mSpanManual spans
@@ -352,9 +363,12 @@ type mspan struct {
 	// undefined and should never be referenced.
 	//
 	// Object n starts at address n*elemsize + (start << pageShift).
+	//
+	// 用于快速寻找可用位置的机制，freeIndex表示下一个可用的object位置
 	freeindex uintptr
 	// TODO: Look up nelems from sizeclass and remove this field if it
 	// helps performance.
+	// 这个span最多可以拥有的object数量
 	nelems uintptr // number of object in the span.
 
 	// Cache of the allocBits at freeindex. allocCache is shifted
@@ -363,6 +377,7 @@ type mspan struct {
 	// ctz (count trailing zero) to use it directly.
 	// allocCache may contain bits beyond s.nelems; the caller must ignore
 	// these.
+	// 这个就是freeindex之后的allocBits，和freeindex合起来能很快查找最新的空的对象空间
 	allocCache uint64
 
 	// allocBits and gcmarkBits hold pointers to a span's mark and
@@ -387,6 +402,7 @@ type mspan struct {
 	// The sweep will free the old allocBits and set allocBits to the
 	// gcmarkBits. The gcmarkBits are replaced with a fresh zeroed
 	// out memory.
+	// 用位来标记span中哪些对象是分配的，哪些对象是未分配的
 	allocBits  *gcBits
 	gcmarkBits *gcBits
 
@@ -401,13 +417,15 @@ type mspan struct {
 	sweepgen    uint32
 	divMul      uint16     // for divide by elemsize - divMagic.mul
 	baseMask    uint16     // if non-0, elemsize is a power of 2, & this will get object allocation base
-	allocCount  uint16     // number of allocated objects
-	spanclass   spanClass  // size class and noscan (uint8)
+	allocCount  uint16     // 已经分配的object个数  number of allocated objects
+	spanclass   spanClass  // span的size. size class and noscan (uint8)
+	// mspan的状态
 	state       mSpanState // mspaninuse etc
 	needzero    uint8      // needs to be zeroed before allocation
 	divShift    uint8      // for divide by elemsize - divMagic.shift
 	divShift2   uint8      // for divide by elemsize - divMagic.shift2
 	scavenged   bool       // whether this span has had its pages released to the OS
+	// 当前span存储的对象size
 	elemsize    uintptr    // computed from sizeclass or from npages
 	limit       uintptr    // end of data in span
 	speciallock mutex      // guards specials list
@@ -648,6 +666,7 @@ func recordspan(vh unsafe.Pointer, p unsafe.Pointer) {
 // noscan spanClass contains only noscan objects, which do not contain
 // pointers and thus do not need to be scanned by the garbage
 // collector.
+// 是class_to_size的下标
 type spanClass uint8
 
 const (
@@ -1079,6 +1098,7 @@ func (h *mheap) alloc_m(npage uintptr, spanclass spanClass, large bool) *mspan {
 // size class and scannability.
 //
 // If needzero is true, the memory for the returned span will be zeroed.
+// mheap分配了
 func (h *mheap) alloc(npage uintptr, spanclass spanClass, large bool, needzero bool) *mspan {
 	// Don't do any operations that lock the heap on the G stack.
 	// It might trigger stack growth, and the stack growth code needs

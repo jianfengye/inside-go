@@ -19,13 +19,16 @@ import "runtime/internal/atomic"
 //go:notinheap
 type mcentral struct {
 	lock      mutex
-	spanclass spanClass
+	spanclass spanClass  // size的类型，这个mcentral管理的size大小
+	// 空闲的span列表
 	nonempty  mSpanList // list of spans with a free object, ie a nonempty free list
+	// 已经分配的Span列表，或者在mcache中的span.
 	empty     mSpanList // list of spans with no free objects (or cached in an mcache)
 
 	// nmalloc is the cumulative count of objects allocated from
 	// this mcentral, assuming all spans in mcaches are
 	// fully-allocated. Written atomically, read under STW.
+	// 从这个central分配的总的对象个数
 	nmalloc uint64
 }
 
@@ -37,6 +40,7 @@ func (c *mcentral) init(spc spanClass) {
 }
 
 // Allocate a span to use in an mcache.
+// mcentral分配mspan
 func (c *mcentral) cacheSpan() *mspan {
 	// Deduct credit for this span allocation and sweep if necessary.
 	spanBytes := uintptr(class_to_allocnpages[c.spanclass.sizeclass()]) * _PageSize
@@ -50,6 +54,7 @@ func (c *mcentral) cacheSpan() *mspan {
 	sg := mheap_.sweepgen
 retry:
 	var s *mspan
+	// 从non-empty中获取要的span
 	for s = c.nonempty.first; s != nil; s = s.next {
 		if s.sweepgen == sg-2 && atomic.Cas(&s.sweepgen, sg-2, sg-1) {
 			c.nonempty.remove(s)
@@ -103,6 +108,7 @@ retry:
 	unlock(&c.lock)
 
 	// Replenish central list if empty.
+	// 这里当mcentral都没有空的span的时候，需要grow
 	s = c.grow()
 	if s == nil {
 		return nil
@@ -252,6 +258,7 @@ func (c *mcentral) grow() *mspan {
 	npages := uintptr(class_to_allocnpages[c.spanclass.sizeclass()])
 	size := uintptr(class_to_size[c.spanclass.sizeclass()])
 
+	// 从mheap中分配n个page
 	s := mheap_.alloc(npages, c.spanclass, false, true)
 	if s == nil {
 		return nil

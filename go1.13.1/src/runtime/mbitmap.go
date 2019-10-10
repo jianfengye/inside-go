@@ -192,6 +192,7 @@ func (s *mspan) refillAllocCache(whichByte uintptr) {
 // or after s.freeindex.
 // There are hardware instructions that can be used to make this
 // faster if profiling warrants it.
+// 获取当前span的后一个空闲的对象
 func (s *mspan) nextFreeIndex() uintptr {
 	sfreeindex := s.freeindex
 	snelems := s.nelems
@@ -330,6 +331,7 @@ func (m *markBits) advance() {
 //
 // nosplit because it is used during write barriers and must not be preempted.
 //go:nosplit
+// 返回这个地址空间的heapBits。用来标记这个空间是对象分配空间（不是goroutine的栈空间）
 func heapBitsForAddr(addr uintptr) (h heapBits) {
 	// 2 bits per word, 4 pairs per byte, and a mask is hard coded.
 	arena := arenaIndex(addr)
@@ -780,6 +782,7 @@ func typeBitsBulkBarrier(typ *_type, dst, src, size uintptr) {
 // If this is a span of pointer-sized objects, it initializes all
 // words to pointer/scan.
 // Otherwise, it initializes all words to scalar/dead.
+// 这个函数设置这个mspan对应的bitmap
 func (h heapBits) initSpan(s *mspan) {
 	size, n, total := s.layout()
 

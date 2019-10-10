@@ -29,6 +29,7 @@ const (
 // 代表基础类型+自定义类型
 type _type struct {
 	size       uintptr // 这个类型的长度
+	// 表示这个对象是个指针
 	ptrdata    uintptr // size of memory prefix holding all pointers
 	hash       uint32 // hash值
 	tflag      tflag

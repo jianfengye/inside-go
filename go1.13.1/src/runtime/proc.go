@@ -3361,7 +3361,7 @@ func newproc1(fn *funcval, argp unsafe.Pointer, narg int32, callergp *g, callerp
 	_p_ := _g_.m.p.ptr()
 	newg := gfget(_p_) // 从p的free g中获取一个g
 	if newg == nil {
-		newg = malg(_StackMin) // 申请一个g的堆空间
+		newg = malg(_StackMin) // 申请一个g的栈空间，2KB
 		casgstatus(newg, _Gidle, _Gdead) // 将newg的状态从idle修改为dead
 		allgadd(newg) // 增加到allg中 publishes with a g->status of Gdead so GC scanner doesn't look at uninitialized stack.
 	}

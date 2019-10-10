@@ -87,6 +87,7 @@ type mstats struct {
 	// previous cycle. This should be ≤ GOGC/100 so the trigger
 	// heap size is less than the goal heap size. This is set
 	// during mark termination for the next cycle's trigger.
+	// 如果活跃的对象空间是上一次周期扫描的1.6倍，就启动gc
 	triggerRatio float64
 
 	// gc_trigger is the heap size that triggers marking.
@@ -97,6 +98,7 @@ type mstats struct {
 	//
 	// This is computed from triggerRatio during mark termination
 	// for the next cycle's trigger.
+	// 如果活跃的对象空间大于这个值，gc就启动
 	gc_trigger uint64
 
 	// heap_live is the number of bytes considered live by the GC.
@@ -136,6 +138,8 @@ type mstats struct {
 	// GC. After mark termination, heap_live == heap_marked, but
 	// unlike heap_live, heap_marked does not change until the
 	// next mark termination.
+	//
+	// 上一轮gc被标记的字节数
 	heap_marked uint64
 }
 

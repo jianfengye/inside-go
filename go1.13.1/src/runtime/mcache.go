@@ -36,13 +36,17 @@ type mcache struct {
 	// 我们只能依靠标记结束来处理微小内存分配。
 	tiny             uintptr // 堆指针，指向微小内存分配地址
 	tinyoffset       uintptr // 堆指针偏移
-	local_tinyallocs uintptr // number of tiny allocs not counted in other stats
+	local_tinyallocs uintptr // 分配的微小对象的分配器 number of tiny allocs not counted in other stats
 
 	// The rest is not accessed on every malloc.
 
-	// 已经分配回来的内存
+	// 已经分配的内存
+	// 注意这里是span链条数组，数组每个元素都是span链，数组的大小是根据span的class作为下标的
+	// 有134个span，67无指针对象和67个有指针对象
+	// 首次为空，当初次申请这个size的时候，会去申请新的这个size的内存，下次如果还有这个size的，就直接从这里获取
 	alloc [numSpanClasses]*mspan // spans to allocate from, indexed by spanClass
 
+	// 这个是为m上的goroutine申请栈空间使用的，如果goroutine要的栈比较少，就从这里获取
 	stackcache [_NumStackOrders]stackfreelist
 
 	// Local allocator stats, flushed during GC.
@@ -123,6 +127,7 @@ func freemcache(c *mcache) {
 //
 // Must run in a non-preemptible context since otherwise the owner of
 // c could change.
+// 代表mcache需要获取新的span了
 func (c *mcache) refill(spc spanClass) {
 	// Return the current cached span to the central lists.
 	s := c.alloc[spc]
@@ -139,6 +144,7 @@ func (c *mcache) refill(spc spanClass) {
 	}
 
 	// Get a new cached span from the central lists.
+	// 这里很关键，从mcentral中获取span
 	s = mheap_.central[spc].mcentral.cacheSpan()
 	if s == nil {
 		throw("out of memory")
