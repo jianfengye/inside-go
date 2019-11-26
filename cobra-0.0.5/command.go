@@ -946,7 +946,7 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 	}
 
 	var flags []string
-	// 没理解这里为什么用两种遍历方式遍历
+	// 两种遍历方式性能不一样，但是结果一样，如果flag特别多，Find比较好，如果flag不多，Traverse好点
 	if c.TraverseChildren {
 		cmd, flags, err = c.Traverse(args)
 	} else {
