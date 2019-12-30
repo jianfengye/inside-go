@@ -31,7 +31,7 @@ import (
 )
 
 // Enforcer is the main interface for authorization enforcement and policy management.
-// Enforcer是权限验证的主题
+// Enforcer是权限验证的主体
 type Enforcer struct {
 	modelPath string      // model文件地址
 	model     model.Model // model结构
