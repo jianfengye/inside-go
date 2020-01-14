@@ -29,6 +29,7 @@ func NewDefaultEffector() *DefaultEffector {
 // MergeEffects merges all matching results collected by the enforcer into a single decision.
 func (e *DefaultEffector) MergeEffects(expr string, effects []Effect, results []float64) (bool, error) {
 	result := false
+	// 囧。。。这里是直接写死了策略。。。，所以多一个空格，少一个空格都是不行的
 	if expr == "some(where (p_eft == allow))" {
 		result = false
 		for _, eft := range effects {

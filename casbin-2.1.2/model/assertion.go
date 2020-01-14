@@ -25,10 +25,10 @@ import (
 // Assertion represents an expression in a section of the model.
 // For example: r = sub, obj, act
 type Assertion struct {
-	Key    string
-	Value  string
-	Tokens []string
-	Policy [][]string
+	Key    string     // 这个是model里面获取的，等号左边的值
+	Value  string     // 这个是从model里面获取的，等号右边的值
+	Tokens []string   // 这个是从model里面获取的，等号右边的值, 已经进行了逗号切割
+	Policy [][]string // 命中这个key的policy，这个是从policy中读取到的
 	RM     rbac.RoleManager
 }
 

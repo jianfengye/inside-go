@@ -21,6 +21,7 @@ import (
 )
 
 // LoadPolicyLine loads a text line as a policy rule to model.
+// 这个是Policy读取一个行的方法，这个是默认的, 如果实现一个Adapter，可以在LoadPolicy中逐行调取解析
 func LoadPolicyLine(line string, model model.Model) {
 	if line == "" || strings.HasPrefix(line, "#") {
 		return

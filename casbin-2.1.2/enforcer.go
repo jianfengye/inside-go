@@ -33,14 +33,14 @@ import (
 // Enforcer is the main interface for authorization enforcement and policy management.
 // Enforcer是权限验证的主体
 type Enforcer struct {
-	modelPath string      // model文件地址
-	model     model.Model // model结构
-	fm        model.FunctionMap
-	eft       effect.Effector
+	modelPath string            // model文件地址
+	model     model.Model       // model结构
+	fm        model.FunctionMap // 自定义函数
+	eft       effect.Effector   // effecter的逻辑
 
 	adapter persist.Adapter // 持久化的Adapter，就是police的Adapter
 	watcher persist.Watcher
-	rm      rbac.RoleManager
+	rm      rbac.RoleManager // 这个要是这个模型是rbac(根据是否有g判断)，就增加这个角色管理器
 
 	enabled            bool // 这个Enforcer的开关
 	autoSave           bool // 如果调用了api修改的Policy，是否自动保存到Adapter中
@@ -81,7 +81,7 @@ func NewEnforcer(params ...interface{}) (*Enforcer, error) {
 			// 第一个参数是字符串，就解析第二个参数
 			switch p1 := params[1].(type) {
 			case string:
-				// 第一，二个参数都是字符串
+				// 第一，二个参数都是字符串，加载policy
 				err := e.InitWithFile(p0, p1)
 				if err != nil {
 					return nil, err
@@ -347,6 +347,7 @@ func (e *Enforcer) BuildRoleLinks() error {
 }
 
 // enforce use a custom matcher to decides whether a "subject" can access a "object" with the operation "action", input parameters are usually: (matcher, sub, obj, act), use model matcher by default when matcher is "".
+// 实际的判断, 调用这个函数之前已经确保model和policy已经加载到e中了
 func (e *Enforcer) enforce(matcher string, rvals ...interface{}) (bool, error) {
 	if !e.enabled {
 		return true, nil
@@ -368,6 +369,7 @@ func (e *Enforcer) enforce(matcher string, rvals ...interface{}) (bool, error) {
 	} else {
 		expString = matcher
 	}
+	// 通过govaluate计算得出表达式
 	expression, err := govaluate.NewEvaluableExpressionWithFunctions(expString, functions)
 	if err != nil {
 		return false, err
@@ -382,6 +384,7 @@ func (e *Enforcer) enforce(matcher string, rvals ...interface{}) (bool, error) {
 		pTokens[token] = i
 	}
 
+	// 组合成当前判断的参数格式
 	parameters := enforceParameters{
 		rTokens: rTokens,
 		rVals:   rvals,
@@ -401,6 +404,7 @@ func (e *Enforcer) enforce(matcher string, rvals ...interface{}) (bool, error) {
 				len(rvals),
 				rvals)
 		}
+		// 对每一个policy进行计算
 		for i, pvals := range e.model["p"]["p"].Policy {
 			// log.LogPrint("Policy Rule: ", pvals)
 			if len(e.model["p"]["p"].Tokens) != len(pvals) {
@@ -413,6 +417,7 @@ func (e *Enforcer) enforce(matcher string, rvals ...interface{}) (bool, error) {
 
 			parameters.pVals = pvals
 
+			// 计算matcher的结果
 			result, err := expression.Eval(parameters)
 			// log.LogPrint("Result: ", result)
 
@@ -420,6 +425,7 @@ func (e *Enforcer) enforce(matcher string, rvals ...interface{}) (bool, error) {
 				return false, err
 			}
 
+			// matcher的结果允许是bool或者float64
 			switch result := result.(type) {
 			case bool:
 				if !result {
@@ -439,6 +445,7 @@ func (e *Enforcer) enforce(matcher string, rvals ...interface{}) (bool, error) {
 
 			if j, ok := parameters.pTokens["p_eft"]; ok {
 				eft := parameters.pVals[j]
+				// 这里就表示policy可以配置p_eft，但是只能配置allow或者deny
 				if eft == "allow" {
 					policyEffects[i] = effect.Allow
 				} else if eft == "deny" {
@@ -461,6 +468,7 @@ func (e *Enforcer) enforce(matcher string, rvals ...interface{}) (bool, error) {
 
 		parameters.pVals = make([]string, len(parameters.pTokens))
 
+		// 表达式计算结果
 		result, err := expression.Eval(parameters)
 		// log.LogPrint("Result: ", result)
 
@@ -477,6 +485,7 @@ func (e *Enforcer) enforce(matcher string, rvals ...interface{}) (bool, error) {
 
 	// log.LogPrint("Rule Results: ", policyEffects)
 
+	// 这个根据policy_effect合并所有的effects，得出了result
 	result, err := e.eft.MergeEffects(e.model["e"]["e"].Value, policyEffects, matcherResults)
 	if err != nil {
 		return false, err
@@ -512,10 +521,10 @@ func (e *Enforcer) EnforceWithMatcher(matcher string, rvals ...interface{}) (boo
 
 // assumes bounds have already been checked
 type enforceParameters struct {
-	rTokens map[string]int
-	rVals   []interface{}
+	rTokens map[string]int // request的格式，key是比如sub这样的值，val是当前所在的位置
+	rVals   []interface{}  // 具体的request的值
 
-	pTokens map[string]int
+	pTokens map[string]int // 具体的policy的格式
 	pVals   []string
 }
 
