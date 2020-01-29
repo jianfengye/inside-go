@@ -42,6 +42,7 @@ var stageSymbolMap = map[OperatorSymbol]evaluationOperator{
 	A "precedent" is a function which will recursively parse new evaluateionStages from a given stream of tokens.
 	It's called a `precedent` because it is expected to handle exactly what precedence of operator,
 	and defer to other `precedent`s for other operators.
+	这个precent代表了一个字符处理逻辑，能根据当前处理的字符，按照某个逻辑，进行处理，处理变成evaluationStage
 */
 type precedent func(stream *tokenStream) (*evaluationStage, error)
 
@@ -77,6 +78,7 @@ func init() {
 	// all these stages can use the same code (in `planPrecedenceLevel`) to execute,
 	// they simply need different type checks, symbols, and recursive precedents.
 	// While not all precedent phases are listed here, most can be represented this way.
+	// 这里组成了一个字符处理的优先级
 	planPrefix = makePrecedentFromPlanner(&precedencePlanner{
 		validSymbols:    prefixSymbols,
 		validKinds:      []TokenKind{PREFIX},

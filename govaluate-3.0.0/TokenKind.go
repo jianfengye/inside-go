@@ -9,24 +9,24 @@ type TokenKind int
 const (
 	UNKNOWN TokenKind = iota
 
-	PREFIX // 前缀 ! - ~
-	NUMERIC  // 数字 12345.678
-	BOOLEAN  // 布尔值 true false
-	STRING // 字符串 foobar
-	PATTERN // 正则
-	TIME   // 时间
-	VARIABLE // 变量
-	FUNCTION // 函数
-	SEPARATOR // 分隔符
+	PREFIX    // 前缀 ! - ~
+	NUMERIC   // 数字 12345.678
+	BOOLEAN   // 布尔值 true false
+	STRING    // 字符串 foobar
+	PATTERN   // 正则
+	TIME      // 时间
+	VARIABLE  // 变量
+	FUNCTION  // 函数
+	SEPARATOR // 分隔符， 逗号
 
-	COMPARATOR  // 比较符号 > >= < <= == != =~ !~
-	LOGICALOP // 逻辑操作 || &&
-	MODIFIER // 修改器 + - / * & | ^ ** % >> << 
+	COMPARATOR // 比较符号 > >= < <= == != =~ !~
+	LOGICALOP  // 逻辑操作 || &&
+	MODIFIER   // 修改器 + - / * & | ^ ** % >> <<
 
 	CLAUSE
 	CLAUSE_CLOSE
 
-	TERNARY  // 三元运算符 ? :
+	TERNARY // 三元运算符 ? :
 )
 
 /*

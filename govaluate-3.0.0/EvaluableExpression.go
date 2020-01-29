@@ -124,6 +124,7 @@ func NewEvaluableExpressionWithFunctions(expression string, functions map[string
 		return nil, err
 	}
 
+	// 执行计划
 	ret.evaluationStages, err = planStages(ret.tokens)
 	if err != nil {
 		return nil, err

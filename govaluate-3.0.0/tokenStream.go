@@ -1,9 +1,10 @@
 package govaluate
 
+// 这个结构是为了读取token串
 type tokenStream struct {
-	tokens      []ExpressionToken
-	index       int
-	tokenLength int
+	tokens      []ExpressionToken // token串
+	index       int               // 读取位置
+	tokenLength int               // token总个数
 }
 
 func newTokenStream(tokens []ExpressionToken) *tokenStream {

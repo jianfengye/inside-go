@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"regexp"
 	"reflect"
+	"regexp"
 )
 
 const (
@@ -20,15 +20,19 @@ type evaluationOperator func(left interface{}, right interface{}, parameters Par
 type stageTypeCheck func(value interface{}) bool
 type stageCombinedTypeCheck func(left interface{}, right interface{}) bool
 
+// 执行计划的结构
 type evaluationStage struct {
-	symbol OperatorSymbol
+	symbol OperatorSymbol  // 操作符号
 
+	// 执行计划的树
 	leftStage, rightStage *evaluationStage
 
 	// the operation that will be used to evaluate this stage (such as adding [left] to [right] and return the result)
+	// 左子树和右子树的操作函数
 	operator evaluationOperator
 
 	// ensures that both left and right values are appropriate for this stage. Returns an error if they aren't operable.
+	// 左右stage类型的检查
 	leftTypeCheck  stageTypeCheck
 	rightTypeCheck stageTypeCheck
 
@@ -46,6 +50,7 @@ var (
 	_false = interface{}(false)
 )
 
+// 两个stage进行交换
 func (this *evaluationStage) swapWith(other *evaluationStage) {
 
 	temp := *other
@@ -66,16 +71,16 @@ func (this *evaluationStage) setToNonStage(other evaluationStage) {
 func (this *evaluationStage) isShortCircuitable() bool {
 
 	switch this.symbol {
-		case AND:
-			fallthrough
-		case OR:
-			fallthrough
-		case TERNARY_TRUE: 
-			fallthrough
-		case TERNARY_FALSE:
-			fallthrough
-		case COALESCE:
-			return true
+	case AND:
+		fallthrough
+	case OR:
+		fallthrough
+	case TERNARY_TRUE:
+		fallthrough
+	case TERNARY_FALSE:
+		fallthrough
+	case COALESCE:
+		return true
 	}
 
 	return false
@@ -85,6 +90,7 @@ func noopStageRight(left interface{}, right interface{}, parameters Parameters) 
 	return right, nil
 }
 
+// 左右stage相加操作
 func addStage(left interface{}, right interface{}, parameters Parameters) (interface{}, error) {
 
 	// string concat if either are strings
@@ -94,33 +100,49 @@ func addStage(left interface{}, right interface{}, parameters Parameters) (inter
 
 	return left.(float64) + right.(float64), nil
 }
+
+// 左右stage相减操作
 func subtractStage(left interface{}, right interface{}, parameters Parameters) (interface{}, error) {
 	return left.(float64) - right.(float64), nil
 }
+
+// 左右stage相乘
 func multiplyStage(left interface{}, right interface{}, parameters Parameters) (interface{}, error) {
 	return left.(float64) * right.(float64), nil
 }
+
+// 左右stage相除
 func divideStage(left interface{}, right interface{}, parameters Parameters) (interface{}, error) {
 	return left.(float64) / right.(float64), nil
 }
+
+// 幂等
 func exponentStage(left interface{}, right interface{}, parameters Parameters) (interface{}, error) {
 	return math.Pow(left.(float64), right.(float64)), nil
 }
+
+// 模操作
 func modulusStage(left interface{}, right interface{}, parameters Parameters) (interface{}, error) {
 	return math.Mod(left.(float64), right.(float64)), nil
 }
+
+// 大于等于
 func gteStage(left interface{}, right interface{}, parameters Parameters) (interface{}, error) {
 	if isString(left) && isString(right) {
 		return boolIface(left.(string) >= right.(string)), nil
 	}
 	return boolIface(left.(float64) >= right.(float64)), nil
 }
+
+// 大于
 func gtStage(left interface{}, right interface{}, parameters Parameters) (interface{}, error) {
 	if isString(left) && isString(right) {
 		return boolIface(left.(string) > right.(string)), nil
 	}
 	return boolIface(left.(float64) > right.(float64)), nil
 }
+
+// 小于等于
 func lteStage(left interface{}, right interface{}, parameters Parameters) (interface{}, error) {
 	if isString(left) && isString(right) {
 		return boolIface(left.(string) <= right.(string)), nil
@@ -270,6 +292,8 @@ func inStage(left interface{}, right interface{}, parameters Parameters) (interf
 	}
 	return false, nil
 }
+
+// ---- 上面是stage之间的各种操作 ------ //
 
 //
 
